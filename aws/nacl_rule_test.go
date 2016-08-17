@@ -2,7 +2,6 @@ package aws
 
 import (
 	"fmt"
-	"log"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -10,6 +9,20 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
+
+// testNetworkACLRule provides a test network ACL rule.
+func testNetworkACLRule() NetworkACLRule {
+	return NetworkACLRule{
+		CidrBlock:    "10.0.1.0/24",
+		Created:      true,
+		Egress:       false,
+		NetworkAclID: "nacl-123456",
+		StartPort:    22,
+		EndPort:      22,
+		PreExisting:  false,
+		RuleNumber:   1,
+	}
+}
 
 // testDescribeNetworkAclsOutput provides test data for the stub
 // DescribeNetworkAcls function.
@@ -97,7 +110,8 @@ func testDeleteNetworkAclEntry(input *ec2.DeleteNetworkAclEntryInput) (*ec2.Dele
 	return &ec2.DeleteNetworkAclEntryOutput{}, nil
 }
 
-// createTestEC2NACLMock returns a testEC2NACLMock object, a mock "connection" to use with the network ACL functions.
+// createTestEC2NACLMock returns a mock EC2 service to use with the network
+// ACL test functions.
 func createTestEC2NACLMock() *ec2.EC2 {
 	conn := ec2.New(session.New(), nil)
 	conn.Handlers.Clear()
@@ -105,17 +119,23 @@ func createTestEC2NACLMock() *ec2.EC2 {
 	conn.Handlers.Send.PushBack(func(r *request.Request) {
 		switch p := r.Params.(type) {
 		case *ec2.DescribeNetworkAclsInput:
-			log.Println("[DEBUG] Executing testDescribeNetworkAcls")
-			data := r.Data.(*ec2.DescribeNetworkAclsOutput)
 			out, err := testDescribeNetworkAcls(p)
-			*data = *out
+			if out != nil {
+				*r.Data.(*ec2.DescribeNetworkAclsOutput) = *out
+			}
 			r.Error = err
 		case *ec2.CreateNetworkAclEntryInput:
-			log.Println("[DEBUG] Executing testCreateNetworkAclEntry")
-			r.Data, r.Error = testCreateNetworkAclEntry(p)
+			out, err := testCreateNetworkAclEntry(p)
+			if out != nil {
+				*r.Data.(*ec2.CreateNetworkAclEntryOutput) = *out
+			}
+			r.Error = err
 		case *ec2.DeleteNetworkAclEntryInput:
-			log.Println("[DEBUG] Executing testDeleteNetworkAclEntry")
-			r.Data, r.Error = testDeleteNetworkAclEntry(p)
+			out, err := testDeleteNetworkAclEntry(p)
+			if out != nil {
+				*r.Data.(*ec2.DeleteNetworkAclEntryOutput) = *out
+			}
+			r.Error = err
 		default:
 			panic(fmt.Errorf("Unsupported input type %T", p))
 		}
@@ -134,5 +154,66 @@ func TestFindVacantNetworkACLRule(t *testing.T) {
 	}
 	if expected != actual {
 		t.Fatalf("Expected %v, got %v", expected, actual)
+	}
+}
+
+func TestFindPreExistingNetworkACLRule(t *testing.T) {
+	conn := createTestEC2NACLMock()
+	acl := "nacl-123456"
+	cidr := "10.0.0.0/24"
+	start := 22
+	end := 22
+	egress := false
+
+	expected := 100
+	actual, err := FindPreExistingNetworkACLRule(conn, acl, cidr, start, end, egress)
+	if err != nil {
+		t.Fatalf("Bad: %s", err.Error())
+	}
+	if expected != actual {
+		t.Fatalf("Expected %v, got %v", expected, actual)
+	}
+}
+
+func TestCreateNetworkACLRule(t *testing.T) {
+	conn := createTestEC2NACLMock()
+	acl := "nacl-123456"
+	cidr := "10.0.1.0/24"
+	start := 22
+	end := 22
+	egress := false
+
+	expectedRule := 1
+	expectedCreated := true
+
+	out, err := CreateNetworkACLRule(conn, acl, cidr, start, end, egress)
+	if err != nil {
+		t.Fatalf("Bad: %s", err.Error())
+	}
+	actualRule := out.RuleNumber
+	actualCreated := out.Created
+
+	if expectedRule != actualRule {
+		t.Fatalf("Expected rule to be %v, got %v", expectedRule, actualRule)
+	}
+	if expectedCreated != actualCreated {
+		t.Fatalf("Expected created to be %v, got %v", expectedCreated, actualCreated)
+	}
+}
+
+func TestDeleteNetworkACLRule(t *testing.T) {
+	conn := createTestEC2NACLMock()
+	acl := testNetworkACLRule()
+
+	expectedCreated := false
+
+	out, err := DeleteNetworkACLRule(conn, acl)
+	if err != nil {
+		t.Fatalf("Bad: %s", err.Error())
+	}
+
+	actualCreated := out.Created
+	if expectedCreated != actualCreated {
+		t.Fatalf("Expected created to be %v, got %v", expectedCreated, actualCreated)
 	}
 }

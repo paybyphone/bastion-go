@@ -2,7 +2,6 @@ package aws
 
 import (
 	"fmt"
-	"log"
 	"sort"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -18,14 +17,14 @@ type NetworkACLRule struct {
 
 	// true if the network ACL rule has been created, or is accounted for (ie: the
 	// PreExisting flag is set).
-	Created bool
+	Created bool `json:"created"`
 
 	// Indicates whether this is an egress rule (rule is applied to traffic leaving
 	// the subnet).
 	Egress bool `json:"egress"`
 
 	// The ID of the network ACL the rule is being inserted into.
-	NetworkAclID string `locationName:"networkAclId" type:"string" required:"true"`
+	NetworkAclID string `json:"network_acl_id"`
 
 	// The starting port in the range that this rule applies to. Normally this
 	// will be the same as EndPort, with the exception of ephemeral rules.
@@ -57,7 +56,6 @@ func FindVacantNetworkACLRule(conn *ec2.EC2, acl string) (int, error) {
 	}
 
 	resp, err := conn.DescribeNetworkAcls(req)
-	log.Printf("[DEBUG] FindVacantNetworkACLRule: response is %#v", resp)
 	if err != nil {
 		return 0, err
 	}
