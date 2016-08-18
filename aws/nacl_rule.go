@@ -176,8 +176,7 @@ func CreateNetworkACLRule(conn *ec2.EC2, acl, cidr string, start, end int, egres
 }
 
 // runNetworkACLRuleDelete runs most of the logic for DeleteNetworkACLRule,
-// but does not set Created to false - that gets performed by
-// RunNetworkACLRuleDelete, which wraps this function.
+// but does not set Created to false.
 func runNetworkACLRuleDelete(conn *ec2.EC2, rule NetworkACLRule) error {
 	// do nothing if the rule was pre-existing.
 	if rule.PreExisting == true {

@@ -145,3 +145,21 @@ func TestCreateSecurityGroup(t *testing.T) {
 		t.Fatalf("Expected name to start with %v, but name is %v", expectedSgNameStart, actualSgName)
 	}
 }
+
+func TestDeleteSecurityGroup(t *testing.T) {
+	conn := createTestEC2SGMock()
+	group := testSecurityGroup()
+
+	expectedCreated := false
+
+	out, err := DeleteSecurityGroup(conn, group)
+	if err != nil {
+		t.Fatalf("Bad: %s", err.Error())
+	}
+
+	actualCreated := out.Created
+
+	if expectedCreated != actualCreated {
+		t.Fatalf("Expected created flag to be %v, got %v", expectedCreated, actualCreated)
+	}
+}
